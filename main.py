@@ -8,7 +8,7 @@ from zigzag.visualization import bar_plot_cost_model_evaluations_breakdown, prin
 workload_path = "zigzag/inputs/workload/resnet18.onnx"  # or "zigzag/inputs/workload/resnet18.yaml"
 accelerator_path = "zigzag/inputs/hardware/tpu_like.yaml"
 mapping_path = "zigzag/inputs/mapping/tpu_like.yaml"
-experiment_id = datetime.now()
+experiment_id = "example"
 dump_folder = f"outputs/{experiment_id}"
 pickle_filename = f"outputs/{experiment_id}/cmes.pickle"
 
