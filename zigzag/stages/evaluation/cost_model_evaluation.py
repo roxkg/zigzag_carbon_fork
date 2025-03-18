@@ -4,6 +4,7 @@ from typing import Any
 from zigzag.cost_model.cost_model import CostModelEvaluation
 from zigzag.cost_model.cost_model_imc import CostModelEvaluationForIMC
 from zigzag.hardware.architecture.accelerator import Accelerator
+from zigzag.hardware.architecture.carbonparam import CarbonParam
 from zigzag.hardware.architecture.imc_array import ImcArray
 from zigzag.mapping.spatial_mapping_internal import SpatialMappingInternal
 from zigzag.mapping.temporal_mapping import TemporalMapping
@@ -25,6 +26,7 @@ class CostModelStage(Stage):
         spatial_mapping: SpatialMappingInternal,
         spatial_mapping_int: SpatialMappingInternal,
         temporal_mapping: TemporalMapping,
+        carbonparam: CarbonParam,
         access_same_data_considered_as_no_access: bool = True,
         **kwargs: Any,
     ):
@@ -35,6 +37,7 @@ class CostModelStage(Stage):
         self.spatial_mapping = spatial_mapping
         self.spatial_mapping_int = spatial_mapping_int
         self.temporal_mapping = temporal_mapping
+        self.carbonparam = carbonparam
         self.access_same_data_considered_as_no_access = access_same_data_considered_as_no_access
 
     def run(self):
@@ -47,15 +50,17 @@ class CostModelStage(Stage):
                 spatial_mapping=self.spatial_mapping,
                 spatial_mapping_int=self.spatial_mapping_int,
                 temporal_mapping=self.temporal_mapping,
+                carbonparam=self.carbonparam,
                 access_same_data_considered_as_no_access=self.access_same_data_considered_as_no_access,
             )
-        else:
+        else: 
             cme = CostModelEvaluation(
                 accelerator=self.accelerator,
                 layer=self.layer,
                 spatial_mapping=self.spatial_mapping,
                 spatial_mapping_int=self.spatial_mapping_int,
                 temporal_mapping=self.temporal_mapping,
+                carbonparam=self.carbonparam,
                 access_same_data_considered_as_no_access=self.access_same_data_considered_as_no_access,
             )
         yield cme, None

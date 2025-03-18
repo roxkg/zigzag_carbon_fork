@@ -16,9 +16,10 @@ from zigzag.stages.mapping.salsa import SalsaStage
 from zigzag.stages.mapping.spatial_mapping_generation import SpatialMappingGeneratorStage
 from zigzag.stages.mapping.temporal_mapping_generator_stage import TemporalMappingGeneratorStage
 from zigzag.stages.parser.accelerator_parser import AcceleratorParserStage
+from zigzag.stages.parser.carbonparam_parser import CarbonParamParserStage
 from zigzag.stages.parser.onnx_model_parser import ONNXModelParserStage
 from zigzag.stages.parser.workload_parser import WorkloadParserStage
-from zigzag.stages.results.reduce_stages import MinimalEDPStage, MinimalEnergyStage, MinimalLatencyStage, SumStage
+from zigzag.stages.results.reduce_stages import MinimalEDPStage, MinimalEnergyStage, MinimalLatencyStage, MinimalCarbonStage, SumStage
 from zigzag.stages.results.save import CompleteSaveStage, PickleSaveStage, SimpleSaveStage
 from zigzag.stages.results.visualization import VisualizationStage
 from zigzag.stages.stage import StageCallable
@@ -28,6 +29,7 @@ from zigzag.stages.workload_iterator import WorkloadStage
 def get_hardware_performance_zigzag(
     workload: str | list[dict[str, Any]] | ModelProto,
     accelerator: str,
+    carbon: str,
     mapping: str,
     *,
     temporal_mapping_search_engine: Literal["loma"] | Literal["salsa"] = "loma",
@@ -41,7 +43,7 @@ def get_hardware_performance_zigzag(
     exploit_data_locality: bool = False,
     enable_mix_spatial_mapping: bool = False,
 ) -> (
-    tuple[float, float, list[tuple[CostModelEvaluationABC, Any]]]
+    tuple[float, float, float, list[tuple[CostModelEvaluationABC, Any]]]
     | tuple[float, float, float, float, list[tuple[CostModelEvaluationABC, Any]]]
 ):
     """! ZigZag API: estimates the cost of running the given workload on the given hardware architecture.
@@ -73,6 +75,8 @@ def get_hardware_performance_zigzag(
             opt_stage = MinimalLatencyStage
         case "EDP":
             opt_stage = MinimalEDPStage
+        case "carbon": 
+            opt_stage = MinimalCarbonStage
         case _:
             raise NotImplementedError("Optimization criterion 'opt' should be either 'energy' or 'latency' or 'EDP'.")
 
@@ -94,6 +98,8 @@ def get_hardware_performance_zigzag(
     stages = [
         # Parse the ONNX Model into the workload
         workload_parser_stage,
+        # Parse the Carbon Model into the carbonparam
+        CarbonParamParserStage, 
         # Parse the accelerator module/passthrough given accelerator
         AcceleratorParserStage,
         # Save the summed CME energy and latency to a json
@@ -129,6 +135,7 @@ def get_hardware_performance_zigzag(
     # Initialize the MainStage as entry point
     mainstage = MainStage(
         list_of_callables=stage_callables,
+        carbon_path = carbon,
         accelerator=accelerator,
         workload=workload,
         mapping=mapping,
@@ -149,13 +156,14 @@ def get_hardware_performance_zigzag(
     cmes = mainstage.run()
     energy_total: float = cmes[0][0].energy_total
     latency_total: float = cmes[0][0].latency_total2
+    carbon_total: float = cmes[0][0].carbon_total
 
     if in_memory_compute:
         tclk: float = cmes[0][1][0][0].tclk
         area: float = cmes[0][1][0][0].area_total
         return energy_total, latency_total, tclk, area, cmes  # type: ignore
 
-    return energy_total, latency_total, cmes
+    return energy_total, latency_total, carbon_total, cmes
 
 
 def get_hardware_performance_zigzag_imc(

@@ -7,21 +7,24 @@ from zigzag.visualization import bar_plot_cost_model_evaluations_breakdown, prin
 
 workload_path = "zigzag/inputs/workload/resnet18.onnx"  # or "zigzag/inputs/workload/resnet18.yaml"
 accelerator_path = "zigzag/inputs/hardware/tpu_like.yaml"
+carbon_path = "zigzag/inputs/carbon/carbon_parameter.yaml"
 mapping_path = "zigzag/inputs/mapping/tpu_like.yaml"
 experiment_id = "example"
 dump_folder = f"outputs/{experiment_id}"
 pickle_filename = f"outputs/{experiment_id}/cmes.pickle"
 
-energy, latency, cmes = api.get_hardware_performance_zigzag(
+energy, latency, carbon, cmes = api.get_hardware_performance_zigzag(
     workload=workload_path,
     accelerator=accelerator_path,
+    carbon=carbon_path, 
     mapping=mapping_path,
-    opt="energy",
+    opt="carbon",
     dump_folder=dump_folder,
     pickle_filename=pickle_filename,
 )
 print(f"Total network energy = {energy:.2e} pJ")
 print(f"Total network latency = {latency:.2e} cycles")
+print(f"Total network carbon = {carbon:.2e} kg")
 
 with open(pickle_filename, "rb") as fp:
     cmes = pickle.load(fp)

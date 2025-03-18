@@ -10,6 +10,7 @@ import numpy as np
 from zigzag.cost_model.port_activity import PortActivity, PortBeginOrEndActivity
 from zigzag.datatypes import ArrayType, Constants, LayerOperand, MemoryOperand
 from zigzag.hardware.architecture.accelerator import Accelerator
+from zigzag.hardware.architecture.carbonparam import CarbonParam
 from zigzag.hardware.architecture.memory_level import MemoryLevel
 from zigzag.hardware.architecture.memory_port import MemoryPort
 from zigzag.hardware.architecture.operational_array import OperationalArray
@@ -55,9 +56,9 @@ class CostModelEvaluationABC(metaclass=ABCMeta):
         self.mac_utilization0: float
         self.mac_utilization1: float
         self.mac_utilization2: float
+        self.carbon_total: float
 
         self.accelerator: Accelerator | None
-
     @property
     def core(self):
         return self.accelerator
@@ -129,6 +130,9 @@ class CostModelEvaluationABC(metaclass=ABCMeta):
         result.latency_total1 = self.latency_total1 + other.latency_total1
         result.latency_total2 = self.latency_total2 + other.latency_total2
 
+        # Carbon 
+        result.carbon_total = self.carbon_total + other.carbon_total
+
         # MAC utilization
         result.mac_spatial_utilization = result.ideal_cycle / result.ideal_temporal_cycle
         result.mac_utilization0 = result.ideal_cycle / result.latency_total0
@@ -192,6 +196,9 @@ class CostModelEvaluationABC(metaclass=ABCMeta):
         result.latency_total0 *= number
         result.latency_total1 *= number
         result.latency_total2 *= number
+
+        # Carbon 
+        result.carbon_total *= number
 
         # MAC utilization
         result.mac_spatial_utilization = result.ideal_cycle / result.ideal_temporal_cycle
@@ -270,6 +277,8 @@ class CumulativeCME(CostModelEvaluationABC):
         self.latency_total1: float = 0.0
         self.latency_total2: float = 0.0
 
+        self.carbon_total: float = 0.0
+
         self.accelerator = None
 
     def __str__(self):
@@ -300,6 +309,7 @@ class CostModelEvaluation(CostModelEvaluationABC):
     layer: LayerNode
     spatial_mapping: SpatialMappingInternal
     temporal_mapping: TemporalMapping
+    carbonparam = CarbonParam
     access_same_data_considered_as_no_access: bool
     cycles_per_op: float
     mem_level_list: list[MemoryLevel]
@@ -320,6 +330,7 @@ class CostModelEvaluation(CostModelEvaluationABC):
         spatial_mapping: SpatialMappingInternal,
         spatial_mapping_int: SpatialMappingInternal,
         temporal_mapping: TemporalMapping,
+        carbonparam: CarbonParam,
         access_same_data_considered_as_no_access: bool = True,
         cycles_per_op: float = 1.0,
     ):
@@ -334,6 +345,7 @@ class CostModelEvaluation(CostModelEvaluationABC):
         self.spatial_mapping = spatial_mapping
         self.spatial_mapping_int = spatial_mapping_int  # the original spatial mapping without decimal
         self.temporal_mapping = temporal_mapping
+        self.carbonparam = carbonparam
         self.access_same_data_considered_as_no_access = access_same_data_considered_as_no_access
         self.mem_level_list = accelerator.memory_hierarchy.mem_level_list
         self.mem_hierarchy_dict = accelerator.mem_hierarchy_dict
@@ -365,6 +377,10 @@ class CostModelEvaluation(CostModelEvaluationABC):
         self.active_mem_level = self.mapping.mem_level
         self.cycles_per_op = cycles_per_op
 
+        self.task_num: int = 1
+        self.carbon_per_task: float = 0.0
+        self.carbon_total: float = 0.0
+
         # Run the cost model evaluation
         self.run()
 
@@ -374,6 +390,7 @@ class CostModelEvaluation(CostModelEvaluationABC):
         self.calc_memory_word_access()
         self.calc_energy()
         self.calc_latency()
+        self.calc_carbon()
 
     @lru_cache(maxsize=512)
     def __get_shared_mem_list(
@@ -627,6 +644,15 @@ class CostModelEvaluation(CostModelEvaluationABC):
         self.combine_data_transfer_rate_per_physical_port()
         self.calc_data_loading_latency()
         self.calc_overall_latency()
+
+    def calc_carbon(self) ->None: 
+        """
+        this function returns operational carbon based on calculated latency and energy cost
+        ope carbon = lifetime * on ratio/latency * energy per task
+        """
+        self.task_num = self.carbonparam.lifetime /self.latency_total2
+        self.carbon_per_task = self.energy_total * self.carbonparam.CI_op
+        self.carbon_total = self.carbon_per_task * self.task_num
 
     def calc_double_buffer_flag(self) -> None:
         """! This function checks the double-buffer possibility for each operand at each memory level
