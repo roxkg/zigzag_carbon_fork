@@ -141,7 +141,7 @@ class MinimalCarbonStage(Stage):
             **kwargs: Any, 
     ):
         super().__init__(list_of_callables, **kwargs)
-        self.keep_others: reduce_minimal_keep_others
+        self.keep_others = reduce_minimal_keep_others
     
     def run(self): 
         sub_list_of_callables = self.list_of_callables[1: ]
